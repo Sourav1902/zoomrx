@@ -1,0 +1,83 @@
+---
+- hosts: mysqlubuntu
+  become: true
+  vars_prompt:
+    - name: root_password
+      prompt: Enter mysql root password
+
+    - name: user_password
+      promt: Enter mysql user password
+
+  tasks:
+    - name: Update local cache of packages
+      apt: update_cache=yes
+    - name: Install required system packages
+      apt:
+        name:
+        - "mysql-server"
+        - "pip"
+        state: present
+    - name: install pexpect #required for expect module
+      pip:
+        name:
+        - "pexpect"
+    - name: start and enable mysql service
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+    - name: Alter mysql root user auth method #Required to run mysql_secure_installation script
+      shell: sudo mysql -e 'ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY "{{ root_password }}";'
+    - name: Execute mysql security script
+      expect:
+        command: sudo mysql_secure_installation
+        responses:
+          'Enter password for user root': '{{ root_password }}'
+          'Change the password for root': 'N'
+          'Would you like to setup VALIDATE PASSWORD component': 'Y'
+          'There are three levels of password validation policy': '2'
+          'New password': '{{ root_password }}'
+          'Re-enter new password': '{{ root_password }}'
+          'Do you wish to continue with the password provided': 'Y'
+          'Remove anonymous user': 'n'
+          'Disallow root login remotely': 'n'
+          'Remove test database and access to it': 'n'
+          'Reload privilege tables now': 'y'
+      register: security_script_output
+    - debug:
+        var: security_script_output
+    - name: Alter mysql root user auth method
+      shell: |
+        mysql -u root -p{{ root_password }} -e 'ALTER USER 'root'@'localhost' IDENTIFIED WITH auth_socket;'
+        sudo mysql -e 'CREATE USER 'sammy'@'localhost' IDENTIFIED BY "{{ user_password }}";'
+        sudo mysql -e 'GRANT CREATE, ALTER, DROP, INSERT, UPDATE, DELETE, SELECT, REFERENCES, RELOAD on *.* TO 'sammy'@'localhost' WITH GRANT OPTION;'
+        sudo mysql -e 'FLUSH PRIVILEGES;'
+
+    - name: stop mysql service
+      service:
+        name: mysql
+        state: stopped
+    - name: Change mysql data directory
+      shell: |
+        sudo rsync -av /var/lib/mysql/ /mnt/
+        sudo mv /var/lib/mysql /var/lib/mysql.bak 
+    - name: Update data directory path in mysql config file
+      lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^#datadir='
+        line: datadir=/mnt/
+    - name: Update new data directory path in AppArmor config file
+      lineinfile:
+        path: /etc/apparmor.d/tunables/alias
+        regexp: '^# alias /var/lib/mysql/ -> /home/mysql/,'
+        line: alias /var/lib/mysql/ -> /mnt/,
+    - name: restart AppArmor service
+      service:
+        name: apparmor
+        state: restarted
+    - name: Change mysql data directory
+      shell: sudo mkdir /var/lib/mysql/mysql -p
+    - name: start mysql service
+      service:
+        name: mysql
+        state: started
