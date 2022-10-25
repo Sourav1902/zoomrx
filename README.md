@@ -2,20 +2,31 @@
 Solutions for ZoomRx DevSecOps Challenge
 
 #1 Ansible playbook
-Solution is in playbook-mysql.yaml.
-The playbook serves the requirements asked in question and suffices to both digital ocean links.
 
+Solution is in playbook-mysql.yaml
+The playbook serves the requirements asked in question and suffices to both digital ocean links.
 Playbook once run, prompts for admin and db user password to be used for setup.
 The password can alternatively be configured to be provided from a var file or with ansible vaults as well in prod like environment.
 
 Tested a run on newly created ubuntu 20.0.4 VMs.
 
+ Execution - ansible-playbook finaldraft -e 'ansible_python_interpreter=/usr/bin/python3'
+ 
+Verified functionality by running below commands as explained in provided links - 
+* sudo mysqladmin -p -u sammy version
+* mysql -u sammy -p
+* SELECT @@datadir;
+
 #2
 The script accepts log directory path, rotate by size or not, rotate by time or not arguments and zips the file accordingly with the timestamp appended.
 
+sh log-rotation.sh /home/azure-user/ size time 
+Will zip all files older than 24 hours as well as any file greater than 5 MB.
+We can choose use only one of these parameters by passing any input other than "size" or "file" at respective places
 
 #3
 The complete chapter is very detailed, below is my understanding of the chapter until i could cover in the given time frame.
+However, I do understand the jist of DB replication as a concept now, and configuration of Binary log file position based replication.
 
 Solution
 
